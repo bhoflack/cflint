@@ -1,0 +1,113 @@
+#!/usr/bin/env python
+
+import collections
+import optparse
+import os
+import re
+import sys
+
+def err(str):
+	print >> sys.stderr, ("%s" % str)
+
+class CFGroup(object):
+	def __init__(self, file, name):
+		self.file = file
+		self.name = name
+
+	def __str__(self):
+		return "CFGroup '%s' defined in %s" % (self.name, self.file)
+
+def parseCF(filename, file):
+	mode = ''
+
+	groups = []
+
+	for line in file:
+		line = line.strip()
+
+		if line.startswith('groups:'):
+			mode = 'G'
+			line = line.replace('groups:', '')
+
+		if mode is 'G':
+			try:
+				(gname, decl) = line.split('=')
+				groups.append(CFGroup(filename, gname.strip()))
+			except ValueError:
+				# There are three possible reasons why the split failed:
+				# 1: We've moved on to a new action, like editfiles
+				# 2: We've hit a group-conditional statement
+				# 3: We're in the middle of a multi-line class definition
+				#
+				# XXX: We do not yet take care of the instance where
+				# 	there's a class-and-statement one liner like
+				#	someclass:: newclass = ( TruthFunc(arg) ).
+				if re.match(r'[a-zA-Z]+:(?!:)', line):
+					mode = ''
+				continue
+		elif (line.startswith('DefineClasses') or
+			line.startswith('ElseDefineClasses') or
+			line.startswith('DefineInGroup')):
+	
+			if "'" in line:
+				quot = "'"
+			elif '"' in line:
+				quot = '"'
+			else:
+				err("Warning: malformed line: %s" % line)
+
+			(decl, groupnames, _) = line.split(quot)
+			groupnames = groupnames.replace(quot, '')
+			for gname in groupnames.split(':'):
+				groups.append(CFGroup(filename, gname.strip()))
+		elif 'define=' in line:
+				# Conveniently enough, this covers the use of
+				# both define= and elsedefine=, for obvious reasons.
+				base_idx = line.find('define=')
+				max_idx = line.find(' ', base_idx)
+
+				if max_idx == -1:
+					max_idx = line.find('\t', base_idx)
+
+				if max_idx == -1:
+			 		define = line[base_idx:]
+				else:
+					define = line[base_idx:max_idx]
+
+				(_, groupnames) = define.split('=')
+				for gname in groupnames.split(':'):
+					groups.append(CFGroup(filename, gname.strip()))
+	
+	return groups
+
+def main(opts, fnames):
+
+	groups = [ parseCF(fname, file(fname)) for fname in fnames ]
+	groups = reduce(list.__add__, groups)
+
+	# Check for multiply-defined groups, which is an indicator that
+	# CFEngine scripts might be trampling each other.
+	groups_defined = collections.defaultdict(list)
+
+	for g in groups:
+		groups_defined[g.name].append(g)
+
+	for k, v in groups_defined.iteritems():
+		def_files = set([g.file for g in v])
+
+		if len(def_files) > 1:
+			print "Warning: Group %s has been declared in:" % k
+			for f in def_files:
+				print "\t%s" % f
+
+if __name__ == '__main__':
+	op = optparse.OptionParser(usage='%prog [options] <files>')
+	(opts, args) = op.parse_args()
+
+	try:
+		(fnames) = args
+	except ValueError:
+		err("%s" % op.get_usage().strip())
+		sys.exit(os.EX_USAGE)
+
+	main(opts, fnames)
