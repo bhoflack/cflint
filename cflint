@@ -128,10 +128,16 @@ def find_group_defines(filename, contents):
 
 def find_group_consumers(fname, contents):
 	for line in contents:
-		if re.match(r'[a-zA-z.]+::', line):
+		if re.match(r'[a-zA-z.&|]+::', line):
 			(guard, _) = line.split('::')
-			for group in guard.split('.'):
-				yield CFGroup(fname, group.strip())
+
+			# normalize out any logical operators
+			for oper in ('.', '&', '|', '!'):
+				guard = guard.replace(oper, ' ')
+
+			for group in guard.split():
+				if group:
+					yield CFGroup(fname, group.strip())
 
 def parseCF(fname, contents):
 	contents = [x.strip() for x in contents]
