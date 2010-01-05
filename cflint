@@ -103,20 +103,24 @@ def find_group_defines(filename, contents):
 		elif 'define=' in line:
 				# Conveniently enough, this covers the use of
 				# both define= and elsedefine=, for obvious reasons.
-				base_idx = line.find('define=')
-				max_idx = line.find(' ', base_idx)
+				for kind in ('define', 'elsedefine'):
+					if kind not in line:
+						continue
 
-				if max_idx == -1:
-					max_idx = line.find('\t', base_idx)
+					base_idx = line.find(kind + '=')
+					max_idx = line.find(' ', base_idx)
 
-				if max_idx == -1:
-			 		define = line[base_idx:]
-				else:
-					define = line[base_idx:max_idx]
+					if max_idx == -1:
+						max_idx = line.find('\t', base_idx)
 
-				(_, groupnames) = define.split('=')
-				for gname in groupnames.split(':'):
-					yield CFGroup(filename, gname.strip())
+					if max_idx == -1:
+				 		define = line[base_idx:]
+					else:
+						define = line[base_idx:max_idx]
+
+					(_, groupnames) = define.split('=')
+					for gname in groupnames.split(':'):
+						yield CFGroup(filename, gname.strip())
 
 def parseCF(fname, contents):
 	contents = [x.strip() for x in contents]
