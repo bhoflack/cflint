@@ -29,6 +29,7 @@
 
 import collections
 import optparse
+import operator
 import os
 import re
 import sys
@@ -42,16 +43,26 @@ class CFGroup(object):
 		self.name = name
 
 	def __str__(self):
-		return "CFGroup '%s' defined in %s" % (self.name, self.file)
+		return "CFGroup '%s' referenced in %s" % (self.name, self.file)
 
-def parseCF(filename, file):
+class AdditiveDict(dict):
+	def __add__(self, rhs):
+		newdict = AdditiveDict()
+
+		for key in set(self.keys() + rhs.keys()):
+			if key in self and key in rhs:
+				newdict[key] = self[key] + rhs[key]
+			elif key in self:
+				newdict[key] = self[key]
+			elif key in rhs:
+				newdict[key] = rhs[key]
+
+		return newdict
+
+def find_group_defines(filename, contents):
 	mode = ''
 
-	groups = []
-
-	for line in file:
-		line = line.strip()
-
+	for line in contents:
 		if line.startswith('groups:'):
 			mode = 'G'
 			line = line.replace('groups:', '')
@@ -59,7 +70,7 @@ def parseCF(filename, file):
 		if mode is 'G':
 			try:
 				(gname, decl) = line.split('=')
-				groups.append(CFGroup(filename, gname.strip()))
+				yield CFGroup(filename, gname.strip())
 			except ValueError:
 				# There are three possible reasons why the split failed:
 				# 1: We've moved on to a new action, like editfiles
@@ -72,6 +83,7 @@ def parseCF(filename, file):
 				if re.match(r'[a-zA-Z]+:(?!:)', line):
 					mode = ''
 				continue
+
 		elif (line.startswith('DefineClasses') or
 			line.startswith('ElseDefineClasses') or
 			line.startswith('DefineInGroup')):
@@ -86,7 +98,8 @@ def parseCF(filename, file):
 			(decl, groupnames, _) = line.split(quot)
 			groupnames = groupnames.replace(quot, '')
 			for gname in groupnames.split(':'):
-				groups.append(CFGroup(filename, gname.strip()))
+				yield CFGroup(filename, gname.strip())
+
 		elif 'define=' in line:
 				# Conveniently enough, this covers the use of
 				# both define= and elsedefine=, for obvious reasons.
@@ -103,14 +116,22 @@ def parseCF(filename, file):
 
 				(_, groupnames) = define.split('=')
 				for gname in groupnames.split(':'):
-					groups.append(CFGroup(filename, gname.strip()))
-	
-	return groups
+					yield CFGroup(filename, gname.strip())
+
+def parseCF(fname, contents):
+	contents = [x.strip() for x in contents]
+
+	return AdditiveDict({
+		'groups_defined': list(find_group_defines(fname, contents)),
+	})
 
 def main(opts, fnames):
 
-	groups = [ parseCF(fname, file(fname)) for fname in fnames ]
-	groups = reduce(list.__add__, groups)
+	inputs = [ parseCF(fname, file(fname)) for fname in fnames ]
+
+	inputs = reduce(operator.add, inputs)
+
+	groups = inputs['groups_defined']
 
 	# Check for multiply-defined groups, which is an indicator that
 	# CFEngine scripts might be trampling each other.
