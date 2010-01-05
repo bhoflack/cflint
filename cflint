@@ -173,35 +173,39 @@ def parseCF(fname, contents):
 		'variables_defined': list(find_variable_defines(fname, contents)),
 	})
 
+def find_multiple_definitions(entities):
+	entities_defined = collections.defaultdict(list)
+
+	for ent in entities:
+		entities_defined[ent.name].append(ent)
+
+	for k, v in entities_defined.iteritems():
+		def_files = set([g.file for g in v])
+
+		if len(def_files) > 1:
+			print "Warning: %s %s declared in:" % (type(v[0]).__name__, k)
+			for f in def_files:
+				print "\t%s" % f
+
+def find_orphans(entities, defines):
+	for ent in entities:
+		if ent.name not in defines:
+			print "Warning: Undefined %s" % (ent)
+
 def main(opts, fnames):
 
 	inputs = [ parseCF(fname, file(fname)) for fname in fnames ]
 
 	inputs = reduce(operator.add, inputs)
 
-	groups = inputs['groups_defined']
-
 	# Check for multiply-defined groups, which is an indicator that
 	# CFEngine scripts might be trampling each other.
-	groups_defined = collections.defaultdict(list)
 
-	for hardgroup in CFENGINE_HARD_GROUPS:
-		groups_defined[hardgroup].append(CFGroup('__builtin__', hardgroup))
-
-	for g in groups:
-		groups_defined[g.name].append(g)
-
-	for k, v in groups_defined.iteritems():
-		def_files = set([g.file for g in v])
-
-		if len(def_files) > 1:
-			print "Warning: Group %s has been declared in:" % k
-			for f in def_files:
-				print "\t%s" % f
-
-	for consumed in inputs['groups_consumed']:
-		if consumed.name not in groups_defined:
-			print "Warning: Undefined group %s" % consumed
+	find_multiple_definitions(inputs['groups_defined'])
+	find_orphans(inputs['groups_consumed'],
+					[x.name for x in inputs['groups_defined']]
+						+ list(CFENGINE_HARD_GROUPS)
+	)
 
 if __name__ == '__main__':
 	op = optparse.OptionParser(usage='%prog [options] <files>')
