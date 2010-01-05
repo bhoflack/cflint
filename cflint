@@ -73,7 +73,7 @@ def find_group_defines(filename, contents):
 
 		if mode is 'G':
 			try:
-				(gname, decl) = line.split('=')
+				(gname, decl) = line.split('=', 1)
 				yield CFGroup(filename, gname.strip())
 			except ValueError:
 				# There are three possible reasons why the split failed:
