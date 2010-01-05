@@ -35,7 +35,8 @@ import re
 import sys
 
 CFENGINE_HARD_GROUPS = (
-	'any', 'freebsd', 'solaris', 'linux'
+	'any', 'freebsd', 'solaris', 'linux', 'redhat', 'gentoo', 'debian',
+	'ubuntu'
 )
 
 def err(str):
