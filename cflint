@@ -157,7 +157,6 @@ def find_variable_defines(fname, contents):
 
 		if mode == 'C':
 			try:
-				print line
 				(var, _) = line.split('=', 1)
 				yield CFVariable(fname, var.strip())
 			except ValueError:
