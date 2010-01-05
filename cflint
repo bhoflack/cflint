@@ -147,12 +147,31 @@ def find_group_consumers(fname, contents):
 				if group:
 					yield CFGroup(fname, group.strip())
 
+def find_variable_defines(fname, contents):
+	mode = ''
+
+	for line in contents:
+		if line.startswith('control:'):
+			mode = 'C'
+			line = line.replace('control:', '')
+
+		if mode == 'C':
+			try:
+				print line
+				(var, _) = line.split('=', 1)
+				yield CFVariable(fname, var.strip())
+			except ValueError:
+				if re.match(r'[a-zA-Z]+:(?!:)', line):
+					mode = ''
+				continue
+
 def parseCF(fname, contents):
 	contents = [x.strip() for x in contents]
 
 	return AdditiveDict({
 		'groups_defined': list(find_group_defines(fname, contents)),
 		'groups_consumed': list(find_group_consumers(fname, contents)),
+		'variables_defined': list(find_variable_defines(fname, contents)),
 	})
 
 def main(opts, fnames):
