@@ -34,6 +34,10 @@ import os
 import re
 import sys
 
+CFENGINE_HARD_GROUPS = (
+	'any', 'freebsd', 'solaris', 'linux'
+)
+
 def err(str):
 	print >> sys.stderr, ("%s" % str)
 
@@ -122,11 +126,19 @@ def find_group_defines(filename, contents):
 					for gname in groupnames.split(':'):
 						yield CFGroup(filename, gname.strip())
 
+def find_group_consumers(fname, contents):
+	for line in contents:
+		if re.match(r'[a-zA-z.]+::', line):
+			(guard, _) = line.split('::')
+			for group in guard.split('.'):
+				yield CFGroup(fname, group.strip())
+
 def parseCF(fname, contents):
 	contents = [x.strip() for x in contents]
 
 	return AdditiveDict({
 		'groups_defined': list(find_group_defines(fname, contents)),
+		'groups_consumed': list(find_group_consumers(fname, contents)),
 	})
 
 def main(opts, fnames):
@@ -141,6 +153,9 @@ def main(opts, fnames):
 	# CFEngine scripts might be trampling each other.
 	groups_defined = collections.defaultdict(list)
 
+	for hardgroup in CFENGINE_HARD_GROUPS:
+		groups_defined[hardgroup].append(CFGroup('__builtin__', hardgroup))
+
 	for g in groups:
 		groups_defined[g.name].append(g)
 
@@ -151,6 +166,10 @@ def main(opts, fnames):
 			print "Warning: Group %s has been declared in:" % k
 			for f in def_files:
 				print "\t%s" % f
+
+	for consumed in inputs['groups_consumed']:
+		if consumed.name not in groups_defined:
+			print "Warning: Undefined group %s" % consumed
 
 if __name__ == '__main__':
 	op = optparse.OptionParser(usage='%prog [options] <files>')
