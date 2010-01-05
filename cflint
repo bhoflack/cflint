@@ -43,6 +43,8 @@ def err(str):
 	print >> sys.stderr, ("%s" % str)
 
 class CFEntity(object):
+	ignore = tuple()
+
 	def __init__(self, file, name):
 		self.file = file
 		self.name = name
@@ -52,10 +54,10 @@ class CFEntity(object):
 												self.name, self.file)
 
 class CFVariable(CFEntity):
-	pass
+	ignore = ('actionsequence')
 
 class CFGroup(CFEntity):
-	pass
+	ignore = CFENGINE_HARD_GROUPS
 
 class AdditiveDict(dict):
 	def __add__(self, rhs):
@@ -182,7 +184,7 @@ def find_multiple_definitions(entities):
 	for k, v in entities_defined.iteritems():
 		def_files = set([g.file for g in v])
 
-		if len(def_files) > 1:
+		if len(def_files) > 1 and k not in type(v[0]).ignore:
 			print "Warning: %s %s declared in:" % (type(v[0]).__name__, k)
 			for f in def_files:
 				print "\t%s" % f
@@ -206,6 +208,8 @@ def main(opts, fnames):
 					[x.name for x in inputs['groups_defined']]
 						+ list(CFENGINE_HARD_GROUPS)
 	)
+
+	find_multiple_definitions(inputs['variables_defined'])
 
 if __name__ == '__main__':
 	op = optparse.OptionParser(usage='%prog [options] <files>')
