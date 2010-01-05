@@ -42,13 +42,20 @@ CFENGINE_HARD_GROUPS = (
 def err(str):
 	print >> sys.stderr, ("%s" % str)
 
-class CFGroup(object):
+class CFEntity(object):
 	def __init__(self, file, name):
 		self.file = file
 		self.name = name
 
 	def __str__(self):
-		return "CFGroup '%s' referenced in %s" % (self.name, self.file)
+		return "%s '%s' referenced in %s" % (type(self).__name__,
+												self.name, self.file)
+
+class CFVariable(CFEntity):
+	pass
+
+class CFGroup(CFEntity):
+	pass
 
 class AdditiveDict(dict):
 	def __add__(self, rhs):
