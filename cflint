@@ -166,6 +166,18 @@ def find_variable_defines(fname, contents):
 					mode = ''
 				continue
 
+def find_variable_consumers(fname, contents):
+	for line in contents:
+		line = line.replace('[', ' ')
+		line = line.replace(']', ' ')
+
+		if '${' in line:
+			for match in re.finditer(r'\$\{([a-zA-Z_]+)\}', line):
+				yield CFVariable(fname, match.group(1))
+		if '$(' in line:
+			for match in re.finditer(r'\$\(([a-zA-Z_]+)\)', line):
+				yield CFVariable(fname, match.group(1))
+
 def parseCF(fname, contents):
 	contents = [x.strip() for x in contents]
 
@@ -173,6 +185,7 @@ def parseCF(fname, contents):
 		'groups_defined': list(find_group_defines(fname, contents)),
 		'groups_consumed': list(find_group_consumers(fname, contents)),
 		'variables_defined': list(find_variable_defines(fname, contents)),
+		'variables_consumed': list(find_variable_consumers(fname, contents)),
 	})
 
 def find_multiple_definitions(entities):
@@ -210,6 +223,8 @@ def main(opts, fnames):
 	)
 
 	find_multiple_definitions(inputs['variables_defined'])
+	find_orphans(inputs['variables_consumed'],
+					[x.name for x in inputs['variables_defined']])
 
 if __name__ == '__main__':
 	op = optparse.OptionParser(usage='%prog [options] <files>')
